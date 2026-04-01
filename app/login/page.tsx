@@ -13,20 +13,43 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [success, setSuccess] = useState("");
   const router = useRouter();
   const supabase = createClient();
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setError(error.message);
-      setLoading(false);
+    setSuccess("");
+
+    if (isSignUp) {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      } else {
+        // Try to sign in immediately (works if email confirmation is disabled)
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) {
+          setSuccess("Account created. Check your email to confirm, then sign in.");
+          setIsSignUp(false);
+          setLoading(false);
+        } else {
+          router.push("/");
+          router.refresh();
+        }
+      }
     } else {
-      router.push("/");
-      router.refresh();
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      } else {
+        router.push("/");
+        router.refresh();
+      }
     }
   }
 
@@ -67,10 +90,10 @@ export default function LoginPage() {
         <div className="bg-card border border-border rounded-xl p-6 space-y-5">
           <div className="flex items-center gap-2 mb-1">
             <TrendingUp className="w-4 h-4 text-primary" />
-            <h2 className="text-sm font-medium">Sign in to your account</h2>
+            <h2 className="text-sm font-medium">{isSignUp ? "Create your account" : "Sign in to your account"}</h2>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email" className="text-xs text-muted-foreground">Email</Label>
               <Input
@@ -104,18 +127,34 @@ export default function LoginPage() {
               </p>
             )}
 
+            {success && (
+              <p className="text-xs text-primary bg-primary/10 border border-primary/20 rounded-md px-3 py-2">
+                {success}
+              </p>
+            )}
+
             <Button
               type="submit"
               className="w-full"
               disabled={loading}
             >
               {loading ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Signing in...</>
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isSignUp ? "Creating account..." : "Signing in..."}</>
               ) : (
-                "Sign In"
+                isSignUp ? "Create Account" : "Sign In"
               )}
             </Button>
           </form>
+
+          <div className="text-center pt-1">
+            <button
+              type="button"
+              onClick={() => { setIsSignUp(!isSignUp); setError(""); setSuccess(""); }}
+              className="text-xs text-muted-foreground hover:text-primary transition-colors"
+            >
+              {isSignUp ? "Already have an account? Sign in" : "Need an account? Sign up"}
+            </button>
+          </div>
         </div>
 
         <p className="text-center text-xs text-muted-foreground">
