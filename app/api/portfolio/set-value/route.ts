@@ -11,9 +11,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Value must be positive" }, { status: 400 });
   }
 
-  await supabase
+  // Ensure settings row exists
+  const { data: existing } = await supabase
     .from("portfolio_settings")
-    .upsert({ user_id: user.id, portfolio_value: value }, { onConflict: "user_id" });
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (existing) {
+    await supabase
+      .from("portfolio_settings")
+      .update({ portfolio_value: value })
+      .eq("user_id", user.id);
+  } else {
+    await supabase
+      .from("portfolio_settings")
+      .insert({ user_id: user.id, portfolio_value: value });
+  }
 
   // Reset shares so they recalculate on next summary refresh
   await supabase

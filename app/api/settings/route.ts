@@ -28,6 +28,7 @@ export async function GET() {
         cash_reserve: 5,
         auto_trade_enabled: false,
         portfolio_value: 10000,
+        ai_strategy: "",
       })
       .select()
       .single();
@@ -58,11 +59,35 @@ export async function PATCH(request: NextRequest) {
 
   const body = await request.json();
 
-  const { data, error } = await supabase
+  // Ensure settings row exists first
+  const { data: existing } = await supabase
     .from("portfolio_settings")
-    .upsert({ user_id: user.id, ...body }, { onConflict: "user_id" })
-    .select()
+    .select("id")
+    .eq("user_id", user.id)
     .single();
+
+  let data, error;
+
+  if (existing) {
+    // Update existing row
+    const result = await supabase
+      .from("portfolio_settings")
+      .update(body)
+      .eq("user_id", user.id)
+      .select()
+      .single();
+    data = result.data;
+    error = result.error;
+  } else {
+    // Insert new row
+    const result = await supabase
+      .from("portfolio_settings")
+      .insert({ user_id: user.id, ...body })
+      .select()
+      .single();
+    data = result.data;
+    error = result.error;
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
