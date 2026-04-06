@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { fmt$ } from "@/lib/format";
 import {
@@ -17,6 +18,7 @@ import {
   Loader2,
   CheckCircle2,
   Shield,
+  Brain,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -38,6 +40,10 @@ export default function SettingsPage() {
   const [rapidApiKey, setRapidApiKey] = useState("");
   const [savingRapid, setSavingRapid] = useState(false);
 
+  // AI Strategy
+  const [aiStrategy, setAiStrategy] = useState("");
+  const [savingStrategy, setSavingStrategy] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -47,6 +53,7 @@ export default function SettingsPage() {
         setSettings(data);
         setModelValue(String(data.portfolio_value || 10000));
         setIsPaper(data.is_paper_trading !== false);
+        setAiStrategy(data.ai_strategy || "");
       }
     } finally {
       setLoading(false);
@@ -243,6 +250,65 @@ export default function SettingsPage() {
                 {settingValue ? <Loader2 className="w-4 h-4 animate-spin" /> : "Set"}
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* AI Strategy Instructions */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Brain className="w-4 h-4 text-primary" /> AI Trading Strategy
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Define custom instructions for the AI to follow when selecting stocks, weighting
+              positions, and making trade decisions. These guide the momentum screen scoring
+              and rebalancing logic.
+            </p>
+            <Textarea
+              placeholder={"Example:\n- Overweight technology and AI infrastructure plays\n- Avoid companies with debt/equity > 1.5\n- Prefer stocks with 3+ consecutive quarters of revenue growth\n- Maximum 40% allocation to any single sector\n- Favor mid-cap ($10B-$50B) over mega-cap for higher momentum potential\n- Exit positions that drop below their 50-day moving average"}
+              value={aiStrategy}
+              onChange={(e) => setAiStrategy(e.target.value)}
+              rows={8}
+              className="text-sm font-mono"
+              data-testid="input-ai-strategy"
+            />
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {aiStrategy.length > 0 ? `${aiStrategy.length} characters` : "No strategy set"}
+              </p>
+              <Button
+                onClick={async () => {
+                  setSavingStrategy(true);
+                  try {
+                    const res = await fetch("/api/settings", {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ ai_strategy: aiStrategy }),
+                    });
+                    if (!res.ok) throw new Error("Failed");
+                    toast({ title: "Strategy saved", description: "AI trading instructions updated" });
+                    load();
+                  } catch (e: any) {
+                    toast({ title: "Error", description: e.message, variant: "destructive" });
+                  } finally {
+                    setSavingStrategy(false);
+                  }
+                }}
+                disabled={savingStrategy}
+                data-testid="btn-save-strategy"
+              >
+                {savingStrategy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Save Strategy
+              </Button>
+            </div>
+            {settings?.ai_strategy && (
+              <div className="bg-primary/5 border border-primary/10 rounded-md p-3">
+                <p className="text-xs font-medium text-primary mb-1">Active Strategy</p>
+                <p className="text-xs text-muted-foreground whitespace-pre-wrap">{settings.ai_strategy}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

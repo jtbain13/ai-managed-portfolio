@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "./auth-provider";
+import { ThemeToggle } from "./theme-toggle";
 import {
   Zap,
   LayoutDashboard,
@@ -66,8 +67,9 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* User / Sign out */}
+      {/* Bottom section */}
       <div className="px-2 py-3 border-t border-border space-y-1">
+        <ThemeToggle />
         {user && (
           <p className="px-3 py-1 text-xs text-muted-foreground truncate">{user.email}</p>
         )}
