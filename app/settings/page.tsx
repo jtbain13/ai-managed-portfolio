@@ -19,6 +19,10 @@ import {
   CheckCircle2,
   Shield,
   Brain,
+  Zap,
+  Bot,
+  Play,
+  FileSpreadsheet,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -43,6 +47,10 @@ export default function SettingsPage() {
   // AI Strategy
   const [aiStrategy, setAiStrategy] = useState("");
   const [savingStrategy, setSavingStrategy] = useState(false);
+
+  // Auto trade
+  const [runningAutoTrade, setRunningAutoTrade] = useState(false);
+  const [autoTradeResult, setAutoTradeResult] = useState<any>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -146,6 +154,129 @@ export default function SettingsPage() {
             Configure trading connections and portfolio parameters
           </p>
         </div>
+
+        {/* Autonomous AI Trading */}
+        <Card className="border-primary/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Bot className="w-4 h-4 text-primary" /> Autonomous AI Trading
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              When enabled, the AI will autonomously screen stocks, select the top momentum picks,
+              and execute all trades through your Alpaca account. All transactions are logged to
+              Google Sheets for full audit trail.
+            </p>
+
+            {!settings?.alpaca_api_key || settings?.alpaca_api_key === "" ? (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
+                <p className="text-xs text-amber-400">Connect your Alpaca account below first before enabling autonomous trading.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Auto-Trade Mode</p>
+                    <p className="text-xs text-muted-foreground">AI manages all buy/sell decisions</p>
+                  </div>
+                  <Switch
+                    checked={settings?.auto_trade_mode === "active"}
+                    onCheckedChange={async (checked) => {
+                      const mode = checked ? "active" : "off";
+                      await fetch("/api/settings", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ auto_trade_mode: mode }),
+                      });
+                      toast({ title: checked ? "AI Trading Activated" : "AI Trading Paused", description: checked ? "The AI will manage your portfolio autonomously" : "Autonomous trading has been paused" });
+                      load();
+                    }}
+                    data-testid="switch-auto-trade"
+                  />
+                </div>
+
+                {settings?.auto_trade_mode === "active" && (
+                  <div className="bg-primary/5 border border-primary/20 rounded-md px-3 py-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Zap className="w-3 h-3 text-primary" />
+                      <p className="text-xs font-medium text-primary">AI Trading Active</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Last run: {settings?.last_auto_trade_at ? new Date(settings.last_auto_trade_at).toLocaleString() : "Never"}
+                    </p>
+                  </div>
+                )}
+
+                <Button
+                  onClick={async () => {
+                    setRunningAutoTrade(true);
+                    setAutoTradeResult(null);
+                    try {
+                      const res = await fetch("/api/auto-trade", { method: "POST" });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error || "Failed");
+                      setAutoTradeResult(data);
+                      toast({ title: "Auto-trade complete", description: `${data.trades?.length || 0} trades executed` });
+                      load();
+                    } catch (e: any) {
+                      toast({ title: "Auto-trade failed", description: e.message, variant: "destructive" });
+                    } finally {
+                      setRunningAutoTrade(false);
+                    }
+                  }}
+                  disabled={runningAutoTrade}
+                  className="w-full"
+                  data-testid="btn-run-auto-trade"
+                >
+                  {runningAutoTrade ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Running AI Trading Cycle...</>
+                  ) : (
+                    <><Play className="w-4 h-4 mr-2" /> Run AI Trade Cycle Now</>
+                  )}
+                </Button>
+
+                {autoTradeResult && (
+                  <div className="bg-card border border-border rounded-md p-3 space-y-2">
+                    <p className="text-xs font-medium">Cycle Results</p>
+                    {autoTradeResult.steps?.map((s: string, i: number) => (
+                      <p key={i} className="text-xs text-muted-foreground">- {s}</p>
+                    ))}
+                    {autoTradeResult.topPicks && (
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {autoTradeResult.topPicks.map((t: string) => (
+                          <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
+                        ))}
+                      </div>
+                    )}
+                    {autoTradeResult.errors?.length > 0 && (
+                      <div className="pt-1">
+                        {autoTradeResult.errors.map((e: string, i: number) => (
+                          <p key={i} className="text-xs text-destructive">{e}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Google Sheets link */}
+            {settings?.google_sheet_id && (
+              <div className="flex items-center gap-2 pt-2">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                <a
+                  href={`https://docs.google.com/spreadsheets/d/${settings.google_sheet_id}/edit`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline"
+                >
+                  View Trading Log in Google Sheets
+                </a>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Alpaca */}
         <Card>
